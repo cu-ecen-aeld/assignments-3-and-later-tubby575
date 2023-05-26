@@ -8,6 +8,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <signal.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -74,8 +75,6 @@ bool do_system(const char *cmd)
 
 bool do_exec(int count, ...)
 {
-    printf("\nStarting do_exec() on pid = %d\n", getpid());
-
     va_list args;
     va_start(args, count);
     char * command[count+1];
@@ -98,31 +97,23 @@ bool do_exec(int count, ...)
  *
 */
 
-    printf("\nForking on PID = %d\n", getpid());
     fflush(stdout);
 
-    int execv_res = 0;
     int status;
     pid_t pid;
     pid = fork();
 
     if(pid == -1)
     {
-        printf("\nFailed fork\n");
+        printf("Failed to fork\n");
         return false;
     }
     else if(pid == 0)
     {
-        char** rem_cmd = (char**)&command[1];
-        printf("\nRunning Exec in child with PID = %d and command = %s %s %s\n", getpid(), command[0], rem_cmd[0], rem_cmd[1]);
-        for(int i = 0; i < count;i++)
-        {
-            printf("\nrem_cmd[%d] = %s", i , rem_cmd[i]);
-        }
-        execv_res = execv(command[0],command);
+        int execv_res = execv(command[0],command);
         if(execv_res == -1)
         {
-            printf("\nExec on PID = %d fail with %s\n" , getpid(), strerror(errno));
+            printf("Exec on PID = %d failed with %s\n" , getpid(), strerror(errno));
             kill(getpid(),SIGINT);
             return false;
         }
@@ -131,32 +122,27 @@ bool do_exec(int count, ...)
     pid_t wait_res = waitpid(pid, &status, 0);
     if(wait_res == -1)
     {
-        printf("\nWaitpid was -1!\n");
+        printf("Failed Waitpid with result -1!\n");
         return false;
     }
     else if(WIFEXITED(status) == true)
     {
-        printf("\nStatus code on PID = %d is %d\n", getpid(), status);
         int exit_code = WEXITSTATUS(status);
         if(exit_code != 0)
         {
-            printf("\nExec Fail on WEXITSTATUS with exit code = %d on PID = %d\n", exit_code, getpid());
+            printf("Exec Fail on WEXITSTATUS with exit code = %d on PID = %d\n", exit_code, getpid());
             return false;
         }
         else
         {
-            printf("\nExec Success on WEXITSTATUS with exit code = %d on PID = %d\n", exit_code, getpid());
             return true;
         }
     }
     else
     {
-        printf("\nExec Fail on WIFEXITED with status = %d on PID = %d\n", status, getpid());
+        printf("Exec Fail on WIFEXITED with status = %d on PID = %d\n", status, getpid());
         return false;
     }
-
-    printf("\nGot to end on PID = %d ...\n", getpid());
-    return false;
 }
 
 /**
@@ -175,10 +161,6 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
-
 
 /*
  * TODO
@@ -190,5 +172,60 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 
     va_end(args);
 
-    return true;
+    int status;
+    pid_t kidpid;
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+
+    if(fd < 0) 
+    {
+        printf("Failed to open file!");
+        return false;
+    }
+
+    switch (kidpid = fork()) 
+    {
+    case -1: 
+        perror("Failed fork"); 
+        return false;
+    case 0:
+        if (dup2(fd, 1) < 0) 
+        { 
+            perror("Failed on dup2");
+            return false;
+        }
+        close(fd);
+        int execv_res = execv(command[0],command);
+        if(execv_res == -1)
+        {
+            printf("Exec on PID = %d failed with %s\n" , getpid(), strerror(errno));
+            kill(getpid(),SIGINT);
+            return false;
+        }
+    default:
+        close(fd);
+        pid_t wait_res = waitpid(kidpid, &status, 0);
+        if(wait_res == -1)
+        {
+            printf("Failed Waitpid with result -1!\n");
+            return false;
+        }
+        else if(WIFEXITED(status) == true)
+        {
+            int exit_code = WEXITSTATUS(status);
+            if(exit_code != 0)
+            {
+                printf("Exec Fail on WEXITSTATUS with exit code = %d on PID = %d\n", exit_code, getpid());
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+        else
+        {
+            printf("Exec Fail on WIFEXITED with status = %d on PID = %d\n", status, getpid());
+            return false;
+        }
+    }
 }
