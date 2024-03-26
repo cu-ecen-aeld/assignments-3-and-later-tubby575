@@ -16,14 +16,23 @@ void* threadfunc(void* thread_param)
 
     struct thread_data* thread_func_args = (struct thread_data *) thread_param;
 
-    sleep(thread_func_args->wait_to_obtain_ms / 1000.0);
-    pthread_mutex_lock(thread_func_args->mutex);
+    usleep(thread_func_args->wait_to_obtain_ms / 1000.0);
+    int lock_unlock_ret = pthread_mutex_lock(thread_func_args->mutex);
+    if (lock_unlock_ret != 0)
+    {
+        thread_func_args->thread_complete_success = false;
+        return thread_param;
+    }
 
-    sleep(thread_func_args->wait_to_release_ms / 1000.0);
+    usleep(thread_func_args->wait_to_release_ms / 1000.0);
+    lock_unlock_ret = pthread_mutex_unlock(thread_func_args->mutex);
+    if (lock_unlock_ret != 0)
+    {
+        thread_func_args->thread_complete_success = false;
+        return thread_param;
+    }
+    
     thread_func_args->thread_complete_success = true;
-
-    pthread_mutex_unlock(thread_func_args->mutex);
-
     return thread_param;
 }
 
