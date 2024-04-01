@@ -56,10 +56,10 @@ fi
 
 for i in $( seq 1 $NUMFILES)
 do
-	/usr/bin/writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
+	writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
-OUTPUTSTRING=$(/usr/bin/finder.sh "$WRITEDIR" "$WRITESTR")
+OUTPUTSTRING=$(finder.sh "$WRITEDIR" "$WRITESTR")
 
 # remove temporary directories
 rm -rf /tmp/aeld-data
@@ -68,7 +68,7 @@ set +e
 echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
 if [ $? -eq 0 ]; then
 	echo "success"
-	/usr/bin/writer "$OUTFILE" "$OUTPUTSTRING"
+	writer "$OUTFILE" "$OUTPUTSTRING"
 	exit 0
 else
 	echo "failed: expected  ${MATCHSTR} in ${OUTPUTSTRING} but instead found"
